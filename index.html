@@ -264,7 +264,32 @@ details.sheet summary { cursor: pointer; font-weight: 500; }
   const $ = id => document.getElementById(id);
   const smooth = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
   const comma = (x, d) => x.toFixed(d).replace(".", ",");
-  const code = (new URLSearchParams(location.search).get("k") || "").trim().toLowerCase();
+  // A donor's own link carries ?k=<code>. The general link has none: each visitor gets an id of their own on their first
+  // visit, kept in this browser, and it goes where a code would (Code.gs OPEN_ID), so each voice lands in its own folder.
+  const given = new URLSearchParams(location.search).get("k");
+  const general = given === null;
+  const visitorId = () => "v" + Array.from(crypto.getRandomValues(new Uint8Array(11)), b => (b % 36).toString(36)).join("");
+  function visitor() {
+    try {
+      const kept = localStorage.getItem("sb-visitor");
+      if (/^v[a-z0-9]{11}$/.test(kept || "")) return kept;
+      const id = visitorId();
+      localStorage.setItem("sb-visitor", id);
+      return id;
+    } catch (e) {
+      // no localStorage: this tab's own id, so a reload at least keeps it
+      try {
+        const kept = sessionStorage.getItem("sb-visitor");
+        if (/^v[a-z0-9]{11}$/.test(kept || "")) return kept;
+        const id = visitorId();
+        sessionStorage.setItem("sb-visitor", id);
+        return id;
+      } catch (e2) {
+        return visitorId();  // nothing kept at all: this visit's own id
+      }
+    }
+  }
+  const code = general ? visitor() : given.trim().toLowerCase();
   const codeOk = /^[a-z0-9]{6,16}$/.test(code);
   // prompt id -> {blob, mime, seconds, n, uid, consent, state: "wait" | "done" | "fail" | "refused", why, tries}
   const takes = new Map();
@@ -322,6 +347,8 @@ details.sheet summary { cursor: pointer; font-weight: 500; }
     }
     try { localStorage.removeItem("sb-consent-" + code); } catch (e) { /* nothing kept */ }
     await forget();
+    // on the general link the next person is a new visitor, with a folder of their own
+    if (general) for (const store of ["localStorage", "sessionStorage"]) try { window[store].removeItem("sb-visitor"); } catch (e) { /* nothing kept */ }
     location.reload();
   });
   function consentRecord() {
@@ -429,12 +456,14 @@ details.sheet summary { cursor: pointer; font-weight: 500; }
   const REFUSED = {
     code: "bu bağlantı geçerli değil; size gönderilen bağlantının tamamını kullanın",
     full: "bu bağlantının kayıt sınırı doldu; lütfen bize haber verin",
+    closed: "bu bağlantı şu an kayıt almıyor; lütfen bağlantıyı gönderen kişiye haber verin",
     size: "kayıt çok büyük",
     mime: "bu kayıt biçimi desteklenmiyor",
     consent: "onay kaydı kabul edilmedi; lütfen bize haber verin",
     take: "kayıt tanınmadı; lütfen bize haber verin",
   };
   const stateText = t => t.state === "refused" ? "yüklenemedi: " + (REFUSED[t.why] || t.why) :
+    t.busy ? "şu an çok yoğun; birazdan kendiliğinden yeniden denenecek" :
     ({ wait: UPLOAD_URL ? "yükleniyor…" : "bu tarayıcıda saklandı", done: "bize ulaştı ✓", fail: "yüklenemedi; internet bağlantınızı kontrol edin" })[t.state];
   function render() {
     const p = PROMPTS[index];
@@ -577,6 +606,8 @@ details.sheet summary { cursor: pointer; font-weight: 500; }
 
   // ---------------------------------------------------------------- uploads: one take at a time, retried, kept until they land
   let pumping = false;
+  // "busy": the general link has had many new visitors this hour; a new visitor's takes wait and try again
+  const BUSY_WAIT_MS = 90000;
   async function pump() {
     if (pumping || !UPLOAD_URL) return;
     pumping = true;
@@ -587,8 +618,10 @@ details.sheet summary { cursor: pointer; font-weight: 500; }
         const [pid, t] = next;
         const res = await upload(pid, t);
         if (takes.get(pid) !== t) continue;  // re-taken meanwhile: the new one goes next
+        t.busy = !!res.busy;
         if (res.ok) { t.state = "done"; persist(pid, t); }
         else if (res.why) { t.state = "refused"; t.why = res.why; }  // the script said no: retrying can't help
+        else if (res.busy) { render(); await new Promise(r => setTimeout(r, BUSY_WAIT_MS)); continue; }  // waits, uncounted
         else {
           t.tries++;
           if (t.tries >= 4) t.state = "fail";
@@ -606,7 +639,8 @@ details.sheet summary { cursor: pointer; font-weight: 500; }
       r.readAsDataURL(blob);
     });
   }
-  // {ok: true}, {why: the script's reason} when it refused, or {} when the network failed and a retry may land
+  // {ok: true}, {why: the script's reason} when it refused, {busy: true} when it asks to wait, or {} when the network
+  // failed and a retry may land
   async function upload(pid, t) {
     const stop = new AbortController();
     // given time for a slow uplink: 30 s, plus a second per 25 kB (a 15 MB phone file at 1 Mbit/s fits)
@@ -618,6 +652,7 @@ details.sheet summary { cursor: pointer; font-weight: 500; }
       if (!r.ok) return {};
       const j = await r.json();
       if (j && j.ok) return { ok: true };
+      if (j && j.error === "busy") return { busy: true };
       return j && j.error && j.error !== "error" ? { why: String(j.error) } : {};
     } catch (e) {
       return {};
@@ -653,11 +688,11 @@ details.sheet summary { cursor: pointer; font-weight: 500; }
       const t = { blob: f, mime: type, seconds: 0, n: 0, uid: uidOf(), consent: consentRecord(), recordedAt: new Date(f.lastModified || Date.now()).toISOString() };
       const pid = "P" + t.uid;
       let res = {};
-      for (let attempt = 0; attempt < 4 && !res.ok && !res.why; attempt++) {
+      for (let attempt = 0; attempt < 4 && !res.ok && !res.why && !res.busy; attempt++) {
         if (attempt) await new Promise(r => setTimeout(r, 2000 * attempt));
         res = await upload(pid, t);
       }
-      li.textContent = f.name + (res.ok ? ": bize ulaştı ✓" : res.why ? ": yüklenemedi: " + (REFUSED[res.why] || res.why) + "." :
+      li.textContent = f.name + (res.ok ? ": bize ulaştı ✓" : res.busy ? ": şu an çok yoğun; biraz sonra (en geç bir saat içinde) dosyayı yeniden seçin." : res.why ? ": yüklenemedi: " + (REFUSED[res.why] || res.why) + "." :
         ": yüklenemedi; internet bağlantınızı kontrol edip dosyayı yeniden seçin.");
     }
   });
