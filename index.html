@@ -1,0 +1,763 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Ses Bağışı · Tabletop</title>
+<style>
+/* A reading booth: one card at a time, the text large, the red "on air" light the only loud thing. */
+:root {
+  --bg: #eef1f0; --panel: #ffffff; --ink: #18201f; --muted: #5b6866; --line: #d3dad8;
+  --accent: #1f6f68; --accent-ink: #ffffff; --air: #c8321e; --air-ink: #ffffff; --ok: #2d7a3e; --warn: #9a6100;
+  --font-body: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+  --font-read: Georgia, "Times New Roman", serif;
+  --font-mono: ui-monospace, Consolas, "SF Mono", Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111716; --panel: #1a2221; --ink: #e6eceb; --muted: #9aa8a6; --line: #2e3a38;
+    --accent: #5fb8ae; --accent-ink: #0e1514; --air: #ff6a52; --air-ink: #1c0905; --ok: #6cc47f; --warn: #e0a640;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 16px; line-height: 1.55;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-top: max(24px, env(safe-area-inset-top, 0px)); padding-bottom: max(48px, env(safe-area-inset-bottom, 0px));
+}
+.wrap { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+header { display: flex; flex-direction: column; gap: 6px; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-size: 30px; line-height: 1.15; margin: 0; font-weight: 600; text-wrap: balance; }
+h2 { font-size: 20px; margin: 0; font-weight: 600; text-wrap: balance; }
+p { margin: 0; max-width: 65ch; }
+.lede { color: var(--muted); }
+section.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+ol.steps, ul.plain { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 6px; max-width: 65ch; }
+label.check { display: flex; gap: 10px; align-items: flex-start; }
+label.check input { margin-top: 5px; width: 18px; height: 18px; flex: none; accent-color: var(--accent); }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field input { font: inherit; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); max-width: 360px; }
+.consent-text { font-family: var(--font-read); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 14px; white-space: pre-line; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+button { font: inherit; font-weight: 500; border-radius: 8px; padding: 10px 16px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+label.pick { display: inline-block; border-radius: 8px; padding: 10px 16px; background: var(--accent); color: var(--accent-ink); cursor: pointer; font-weight: 500; }
+button.rec { background: var(--air); border-color: var(--air); color: var(--air-ink); min-width: 9em; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.status { font-size: 14px; color: var(--muted); }
+.status.ok { color: var(--ok); }
+.status.err { color: var(--air); }
+.status.warn { color: var(--warn); }
+.banner { border: 1px solid var(--air); color: var(--air); border-radius: 8px; padding: 12px 14px; }
+.card-top { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: baseline; }
+.sec { font-family: var(--font-mono); font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+.count { font-family: var(--font-mono); font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.read { font-family: var(--font-read); font-size: clamp(24px, 5.2vw, 36px); line-height: 1.35; text-wrap: balance; min-height: 3.2em; overflow-wrap: anywhere; }
+.how { font-style: italic; color: var(--muted); }
+.meter { height: 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.meter > i { display: block; height: 100%; width: 0%; background: var(--accent); transition: width 60ms linear; }
+.meter.hot > i { background: var(--air); }
+.onair { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 13px; color: var(--muted); }
+.onair::before { content: ""; width: 12px; height: 12px; border-radius: 50%; background: var(--line); }
+.onair.live { color: var(--air); }
+.onair.live::before { background: var(--air); box-shadow: 0 0 0 4px color-mix(in srgb, var(--air) 25%, transparent); }
+.dots { display: flex; flex-wrap: wrap; gap: 4px; }
+.dots b { width: 10px; height: 10px; border-radius: 2px; background: var(--line); }
+.dots b.wait { background: var(--warn); }
+.dots b.done { background: var(--ok); }
+.dots b.fail { background: var(--air); }
+.dots b.here { outline: 2px solid var(--accent); outline-offset: 1px; }
+details.sheet summary { cursor: pointer; font-weight: 500; }
+.sheet ol { font-family: var(--font-read); padding-left: 28px; display: flex; flex-direction: column; gap: 4px; }
+.sheet h3 { font-size: 15px; margin: 14px 0 4px; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--accent); }
+@media (prefers-reduced-motion: reduce) { .meter > i { transition: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Tabletop · Okey 101 · bot sesleri</div>
+    <h1>Sesinizi masaya bağışlayın</h1>
+    <p class="lede">Oyunumuzdaki botlar anlamsız ama akıcı bir “bot dili” konuşuyor. Bu dili gerçek insan seslerinden kurmak istiyoruz. Aşağıdaki metinleri sesli okuyup kaydetmeniz yeterli: yaklaşık 25–30 dakika sürer. Her kayıt, siz kaydettikçe bize ulaşır.</p>
+  </header>
+
+  <div class="banner" id="noCode" hidden>Bu bağlantı eksik görünüyor. Lütfen size gönderilen bağlantının tamamını kullanın.</div>
+  <div class="banner" id="noUpload" hidden>Yükleme şu an kapalı (deneme sürümü). Kayıtlarınız bu tarayıcıda saklanır.</div>
+
+  <section class="panel" id="intro">
+    <h2>Başlamadan önce</h2>
+    <ul class="plain">
+      <li>Sessiz bir oda seçin: televizyon, müzik, klima ve pencere kapalı olsun. Halı, perde ve yumuşak eşyalar yankıyı azaltır.</li>
+      <li>Ağzınızla mikrofon arasında bir karış (yaklaşık 20 cm) olsun; telefonu ya da bilgisayarı masaya sabitleyin. Kulaklıklı mikrofon da olur.</li>
+      <li>Kendi doğal sesinizle, rahat okuyun. Hata yaparsanız aynı metni yeniden kaydedebilirsiniz; son kayıt geçerli olur.</li>
+      <li>Sesiniz çoğunlukla hecelere ayrılıp yeniden birleştirilerek kullanılacak; okuduğunuz cümleler oyunda olduğu gibi duyulmayacak. Kısa ünlemler, gülmeler ve iç çekmeler ise olduğu gibi duyulabilir.</li>
+    </ul>
+  </section>
+
+  <section class="panel" id="consent">
+    <h2>1. Onay</h2>
+    <div class="consent-text" id="consentText"></div>
+    <p class="status">Kişisel verileriniz hakkında: onayınız kayıtlarınızla birlikte saklanır. İzninizi oyun yayımlanana kadar geri çekebilirsiniz; o zaman kayıtlarınız silinir.</p>
+    <div class="field">
+      <label for="donorName">Adınız soyadınız (ya da sizi tanıdığımız takma ad)</label>
+      <input id="donorName" type="text" autocomplete="name" maxlength="80">
+    </div>
+    <label class="check"><input id="ageOk" type="checkbox"><span>18 yaşını doldurdum.</span></label>
+    <label class="check"><input id="consentOk" type="checkbox"><span>Yukarıdaki metni okudum ve kabul ediyorum.</span></label>
+    <label class="check"><input id="abroadOk" type="checkbox"><span>Kayıtlarımın ve onayımın Google Drive’da, Google’ın yurt dışındaki sunucularında saklanmasına açıkça izin veriyorum.</span></label>
+    <div class="row">
+      <button class="primary" id="acceptBtn" type="button" disabled>Kabul ediyorum, devam</button>
+      <span class="status" id="consentStatus" role="status"></span>
+      <button id="notMeBtn" type="button" hidden>Ben değilim, baştan başla</button>
+    </div>
+  </section>
+
+  <section class="panel" id="mode" hidden>
+    <h2>2. Mikrofon</h2>
+    <p id="modeText">Önce mikrofonu deneyin. Tarayıcı izin isterse “İzin ver” deyin.</p>
+    <div class="row">
+      <button class="primary" id="micBtn" type="button">Mikrofonu dene</button>
+      <span class="onair" id="testAir">mikrofon kapalı</span>
+    </div>
+    <div class="meter" id="testMeter" hidden><i></i></div>
+    <p class="status" id="micStatus" role="status"></p>
+    <button id="phoneBtn" type="button" hidden>Telefonun ses kayıt uygulamasıyla kaydet</button>
+    <div id="phoneHelp" hidden>
+      <p id="phoneWhy">Bu tarayıcı sayfadan kayıt yapamıyor. Telefonunuzun ses kayıt uygulamasıyla kaydedip dosyaları buradan yükleyebilirsiniz:</p>
+      <ol class="steps">
+        <li>Ses kayıt uygulamasını açın (iPhone: <b>Sesli Notlar</b>; Android: <b>Ses Kaydedici</b>). Kaliteyi standart ya da yüksek (m4a) bırakın; WAV ya da kayıpsız (Lossless) seçmeyin, dosyalar çok büyür.</li>
+        <li>Aşağıdaki okuma metnini bölüm bölüm okuyun: her bölüm için bir kayıt. Her metinden önce numarasını söyleyin (“on iki”), sonra metni okuyun ve <b>2 saniye</b> susun.</li>
+        <li>Kayıt dosyalarını aşağıdan seçip yükleyin.</li>
+      </ol>
+      <div class="row">
+        <label class="pick" for="fileIn">Kayıt dosyalarını seç</label>
+        <input id="fileIn" type="file" accept="audio/*" multiple hidden>
+        <span class="status" id="fileStatus" role="status"></span>
+      </div>
+      <ul class="plain" id="fileList"></ul>
+    </div>
+  </section>
+
+  <section class="panel" id="booth" hidden>
+    <div class="card-top">
+      <span class="sec" id="secName"></span>
+      <span class="count" id="count"></span>
+    </div>
+    <div class="read" id="readText"></div>
+    <p class="how" id="howText"></p>
+    <div class="meter" id="meter"><i></i></div>
+    <div class="row">
+      <button class="rec" id="recBtn" type="button">● Kaydet</button>
+      <button id="playBtn" type="button" disabled>▶ Dinle</button>
+      <span class="onair" id="air" role="status">hazır</span>
+      <span class="count" id="takeLen"></span>
+    </div>
+    <p class="status" id="upStatus" role="status"></p>
+    <div class="row">
+      <button id="prevBtn" type="button">← Önceki</button>
+      <button class="primary" id="nextBtn" type="button">Sonraki →</button>
+      <button id="retryBtn" type="button" hidden>Yüklenemeyenleri yeniden dene</button>
+    </div>
+    <div class="dots" id="dots" aria-hidden="true"></div>
+    <p class="status" id="boothStatus" role="status"></p>
+    <p class="status">Kısayollar: Boşluk tuşu kaydı başlatır ve durdurur; ← → metinler arasında gezer.</p>
+  </section>
+
+  <section class="panel" id="finish" hidden>
+    <h2>3. Bitti mi?</h2>
+    <p id="finishText"></p>
+    <p class="lede">Atladığınız metinler sorun değil; ne kadar çok, o kadar iyi. Sayfayı kapatmadan önce bütün karelerin yeşil olduğuna bakın. Yüklenemeyen kayıtlar bu tarayıcıda bir hafta kadar saklanır: bağlantıyı aynı tarayıcıda yeniden açtığınızda yüklenmeye devam eder. Teşekkürler; sesiniz masada olacak.</p>
+  </section>
+
+  <section class="panel">
+    <details class="sheet" id="sheet">
+      <summary>Tüm okuma metni</summary>
+      <div id="sheetBody"></div>
+    </details>
+  </section>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  // ---------------------------------------------------------------- set when the director deploys the upload script
+  const UPLOAD_URL = "";
+  const KIT = "ses-bagisi-web-1";
+  const MAX_FILE = 15 * 1024 * 1024;  // a phone file; the upload script refuses more (Code.gs MAX_PHONE)
+
+  // ---------------------------------------------------------------- the texts (ses-bagisi.html's, the consent at v2 for the Drive)
+  const CONSENT_VERSION = "v2, 2026-10-26";
+  const CONSENT = "Bu sayfadaki metinleri okuyarak sesimi kaydediyorum.\n\n" +
+    "Kayıtlarımın, Tabletop adlı ticari bir video oyununda (ilk oyunu Okey 101) bot karakterlerin konuşma seslerini üretmek için işlenmesine, düzenlenmesine ve kullanılmasına izin veriyorum. Sesim çoğunlukla hecelere ayrılıp yeniden birleştirilerek anlamsız bir “bot dili” olarak kullanılacak; okuduğum cümleler oyunda olduğu gibi duyulmayacak. Kısa ünlemlerim, gülmelerim ve iç çekmelerim ise olduğu gibi kullanılabilir.\n\n" +
+    "Kayıtlarım bir yapay zekâ ses modelini eğitmek ya da sesimi taklit etmek (ses klonlama) için kullanılmayacak; başka bir amaçla kullanılmayacak ve başkalarına verilmeyecek. Oyunun yayıncıları ve satış platformları (ör. Steam) oyunu, içindeki seslerle birlikte dağıtabilir.\n\n" +
+    "Bu izin bedelsizdir; oyunun satıldığı her yerde ve süresiz geçerlidir. Oyun yayımlanana kadar, bu sayfayı bana gönderen oyun yapımcısına yazılı olarak (e-posta ya da mesajla) bildirerek iznimi geri çekebilirim; o zaman kayıtlarım silinir. Oyun yayımlandıktan sonra sesim oyundan çıkarılamaz. Adım oyunda ya da tanıtımlarda ancak ayrıca izin verirsem anılır.\n\n" +
+    "Kayıtlarımla birlikte adım, onay tarihim ve kaydı yaptığım tarayıcının teknik bilgileri saklanır. Kayıtlarım ve bu bilgiler, oyun yapımcısının Google Drive hesabında, Google’ın yurt dışındaki sunucularında saklanır; buna da izin veriyorum.";
+
+  const SECTIONS = [
+    { name: "Cümleler", how: "Doğal bir sesle, sohbet eder gibi okuyun.", max: 20 },
+    { name: "Heceler", how: "Her heceyi kısa ve net söyleyin, aralarında kısa bir durak bırakın; düz, rahat bir tonla.", max: 20 },
+    { name: "Duygular", how: "", max: 12 },
+    { name: "Serbest", how: "", max: 40 },
+  ];
+  const SENTENCES = [
+    "Merhaba, ben bu masada okey oynamaya geldim.",
+    "Sıra sende; bir taş çek, düşün ve elindekini at.",
+    "Kırmızı yediyle siyah yediyi yan yana dizdim.",
+    "Gösterge mavi on üç, okey de mavi bir.",
+    "Yüz biri geçtim, şimdi elimi açabilirim.",
+    "Çifte gitmek cesaret ister ama bu el çok güzel.",
+    "Ortadaki taşı alırsam perim tamamlanıyor.",
+    "Bu turda kimse açamadı, deste de bitmek üzere.",
+    "Şansım döndü; sarı dörtlü tam istediğim gibi geldi.",
+    "Jilet gibi bir el, hiç düşünmeden bitiriyorum.",
+    "Fehmi Bey çayını yudumlarken ağır ağır güldü.",
+    "Öğle yemeğinden sonra üç tur daha atalım mı?",
+    "Pijamalı Zeynep vazoyu kırınca utandı.",
+    "Ağabeyim taşları yavaş yavaş dağıttı.",
+    "Hiç böyle bir şey görmedim, inanılır gibi değil!",
+    "Rüzgâr esti, kâğıtlar uçtu, herkes kahkahayı bastı.",
+    "İstanbul’dan gelen İsmail ilk elde iki okey çekti.",
+    "Öfkeyle kalkan zararla oturur, sakin ol.",
+    "Bekle bakalım, bu taş kimin işine yarayacak?",
+    "Elim çok kötü ama pes etmek yok.",
+    "Tavla mı okey mi derken sabah oldu.",
+    "Dördümüz kafa kafaya verdik, üst üste üç el kazandık.",
+    "Ufak bir hata yaptım, şimdi cezasını ödüyorum.",
+    "Hâlâ bir okey bile çekemedim, inanır mısın?",
+    "Görüşürüz arkadaşlar, bir sonraki elde rövanş var!",
+  ];
+  const VOWELS = ["a", "e", "ı", "i", "o", "ö", "u", "ü"];
+  const ONSETS = ["b", "c", "ç", "d", "f", "g", "h", "j", "k", "l", "m", "n", "p", "r", "s", "ş", "t", "v", "y", "z"];
+  const SYLLABLES = [VOWELS.join(" · ")]
+    .concat(ONSETS.map(c => VOWELS.map(v => c + v).join(" · ")))
+    .concat([VOWELS.map(v => v + "ğ" + v).join(" · ")])
+    .concat(["l", "n", "r", "k", "ş"].map(c => VOWELS.map(v => v + c).join(" · ")));
+  const FEELINGS = [
+    ["Hadi!", "sabırsızca"], ["Hadi bakalım!", "neşeyle"], ["Eyvah!", "telaşla"], ["Tüh!", "hayal kırıklığıyla"],
+    ["Vay be!", "hayranlıkla"], ["Oley!", "sevinçle"], ["Yuh!", "alaycı bir itirazla"], ["Aman aman!", "korkmuş gibi"],
+    ["Of ya!", "sıkılarak"], ["Oha!", "çok şaşırarak"], ["Hay Allah!", "kendi kendine söylenerek"],
+    ["Yaşasın!", "coşkuyla, ama bağırmadan"], ["Aaa, nasıl yani?", "şaşkınlıkla"], ["Hmm, şey… dur bir düşüneyim.", "düşünerek"],
+    ["Ha ha ha! Bu çok iyiydi!", "gerçekten gülerek"], ["Hı hı, tabii tabii.", "dalga geçer gibi"],
+    ["Pöh, ne olacak ki!", "umursamazca"], ["Ay, inanamıyorum!", "heyecanla"], ["Ooo, kimler gelmiş!", "birini karşılar gibi"],
+    ["Ah be, ah!", "dertlenerek"], ["Kıh kıh kıh…", "kıs kıs gülerek"], ["Hoppala!", "beklenmedik bir şey karşısında"],
+  ];
+  const FREE = [
+    ["(Anlamsız ama Türkçeye benzeyen hecelerle 20 saniye konuşun.)", "Sakin sakin, sanki biriyle sohbet ediyorsunuz."],
+    ["(Aynısını şimdi heyecanla ve hızlı yapın.)", "Sanki oyunu kazanmak üzeresiniz."],
+    ["(Son olarak homurdanarak, söylenir gibi konuşun.)", "Sanki elinize kötü bir taş geldi."],
+  ];
+  const pad = n => String(n).padStart(2, "0");
+  const PROMPTS = [];
+  SENTENCES.forEach((t, i) => PROMPTS.push({ id: "S" + pad(i + 1), sec: 0, text: t, how: "" }));
+  SYLLABLES.forEach((t, i) => PROMPTS.push({ id: "H" + pad(i + 1), sec: 1, text: t, how: "" }));
+  FEELINGS.forEach(([t, h], i) => PROMPTS.push({ id: "D" + pad(i + 1), sec: 2, text: t, how: h }));
+  FREE.forEach(([t, h], i) => PROMPTS.push({ id: "B" + pad(i + 1), sec: 3, text: t, how: h }));
+
+  // ---------------------------------------------------------------- state
+  const $ = id => document.getElementById(id);
+  const smooth = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+  const comma = (x, d) => x.toFixed(d).replace(".", ",");
+  const code = (new URLSearchParams(location.search).get("k") || "").trim().toLowerCase();
+  const codeOk = /^[a-z0-9]{6,16}$/.test(code);
+  // prompt id -> {blob, mime, seconds, n, uid, consent, state: "wait" | "done" | "fail" | "refused", why, tries}
+  const takes = new Map();
+  let index = 0, donor = "", consentAt = "";
+  let stream = null, ctx = null, analyser = null, source = null, recording = null, starting = false, mime = "";
+  let meterTarget = null;
+  const uidOf = () => Array.from(crypto.getRandomValues(new Uint8Array(8)), b => (b % 36).toString(36)).join("") + Date.now().toString(36).slice(-4);
+
+  $("consentText").textContent = CONSENT;
+  renderSheet();
+  if (!codeOk) {
+    $("noCode").hidden = false;
+    ["donorName", "ageOk", "consentOk", "abroadOk"].forEach(id => { $(id).disabled = true; });
+  }
+  if (!UPLOAD_URL) $("noUpload").hidden = false;
+
+  // ---------------------------------------------------------------- consent
+  const consentReady = () => codeOk && $("donorName").value.trim().length >= 2 && $("ageOk").checked && $("consentOk").checked && $("abroadOk").checked;
+  ["donorName", "ageOk", "consentOk", "abroadOk"].forEach(id => ["input", "change"].forEach(ev => $(id).addEventListener(ev, () => { $("acceptBtn").disabled = !consentReady(); })));
+  $("acceptBtn").addEventListener("click", () => {
+    if (!consentReady()) return;
+    donor = $("donorName").value.trim();
+    consentAt = new Date().toISOString();
+    try { localStorage.setItem("sb-consent-" + code, JSON.stringify({ donor, consentAt, version: CONSENT_VERSION })); } catch (e) { /* per-browser convenience only */ }
+    acceptedUi(true);
+  });
+  function acceptedUi(scroll) {
+    $("consentStatus").textContent = "Teşekkürler, " + donor + ".";
+    $("consentStatus").className = "status ok";
+    ["donorName", "ageOk", "consentOk", "abroadOk", "acceptBtn"].forEach(id => { $(id).disabled = true; });
+    $("donorName").value = donor; $("ageOk").checked = true; $("consentOk").checked = true; $("abroadOk").checked = true;
+    $("notMeBtn").hidden = false;
+    $("mode").hidden = false;
+    if (scroll) {
+      $("mode").scrollIntoView({ behavior: smooth, block: "start" });
+      $("micBtn").focus({ preventScroll: true });
+    }
+    // takes kept from an earlier visit start uploading at once, before (and without) the microphone; deferred, as a
+    // returning donor gets here while this script is still starting up
+    Promise.resolve().then(restore).then(() => { render(); pump(); });
+  }
+  // a donor who comes back on the same browser keeps their consent and their takes
+  try {
+    const kept = codeOk ? JSON.parse(localStorage.getItem("sb-consent-" + code) || "null") : null;
+    if (kept && kept.donor && kept.consentAt && kept.version === CONSENT_VERSION) { donor = kept.donor; consentAt = kept.consentAt; acceptedUi(false); }
+  } catch (e) { /* nothing kept */ }
+  // someone else on the same browser and link: they start over once the first person's takes have all landed
+  $("notMeBtn").addEventListener("click", async () => {
+    if (recording || starting) return;
+    const pending = [...takes.values()].filter(t => t.state === "wait" || t.state === "fail").length;
+    if (pending) {
+      $("consentStatus").textContent = "Önceki kişinin " + pending + " kaydı henüz yükleniyor ya da yüklenemedi; bunlar bize ulaşınca yeniden deneyin.";
+      $("consentStatus").className = "status err";
+      return;
+    }
+    try { localStorage.removeItem("sb-consent-" + code); } catch (e) { /* nothing kept */ }
+    await forget();
+    location.reload();
+  });
+  function consentRecord() {
+    return { version: CONSENT_VERSION, accepted_at: consentAt, name: donor, age_18_plus: true, abroad_ok: true, text: CONSENT, kit: KIT, user_agent: navigator.userAgent };
+  }
+
+  // ---------------------------------------------------------------- the microphone
+  function pickMime() {
+    if (typeof MediaRecorder === "undefined") return null;
+    for (const m of ["audio/webm;codecs=opus", "audio/mp4", "audio/ogg;codecs=opus", "audio/webm"]) {
+      try { if (MediaRecorder.isTypeSupported(m)) return m; } catch (e) { /* try the next */ }
+    }
+    return "";
+  }
+  const live = () => !!stream && stream.getAudioTracks().some(t => t.readyState === "live");
+  async function openMic() {
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 } });
+    if (!ctx) {
+      ctx = new (window.AudioContext || window.webkitAudioContext)();
+      analyser = ctx.createAnalyser();
+      analyser.fftSize = 1024;
+      requestAnimationFrame(meterLoop);
+    }
+    // iOS may start it suspended outside the tap that asked for the microphone
+    try { if (ctx.state === "suspended") await ctx.resume(); } catch (e) { /* resumed on the next tap */ }
+    if (source) source.disconnect();
+    source = ctx.createMediaStreamSource(stream);
+    source.connect(analyser);
+  }
+  let micReady = false, micAsking = false;
+  $("micBtn").addEventListener("click", async () => {
+    try { if (ctx && ctx.state === "suspended") await ctx.resume(); } catch (e) { /* the meter only */ }
+    if (micReady) { startBooth(); return; }
+    if (micAsking) return;
+    $("micStatus").textContent = "";
+    const m = pickMime();
+    if (m === null || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { phoneRoute(false); return; }
+    micAsking = true;
+    try {
+      await openMic();
+      mime = m;
+      micReady = true;
+      meterTarget = $("testMeter");
+      $("testMeter").hidden = false;
+      $("testAir").textContent = "mikrofon açık";
+      $("testAir").classList.add("live");
+      $("micStatus").textContent = "Mikrofon çalışıyor. Birkaç kelime söyleyin: konuşurken çubuk çoğunlukla yüzde 60 ile 90 arasında dolmalı, kırmızıya dönmemeli. Çok boş kalıyorsa mikrofona biraz yaklaşın. Hazırsanız başlayın.";
+      $("micStatus").className = "status ok";
+      $("micBtn").textContent = "Kayda başla";
+      $("phoneBtn").hidden = true;
+    } catch (e) {
+      $("micStatus").textContent = "Mikrofona erişilemedi (izin verilmemiş ya da mikrofon yok). Tarayıcının adres çubuğundan mikrofon iznini açıp yeniden deneyin ya da telefonunuzun ses kayıt uygulamasıyla kaydedin.";
+      $("micStatus").className = "status err";
+      $("micBtn").textContent = "Mikrofonu yeniden dene";
+      $("phoneBtn").hidden = false;
+    } finally {
+      micAsking = false;
+    }
+  });
+  $("phoneBtn").addEventListener("click", () => phoneRoute(true));
+  function phoneRoute(chosen) {
+    $("micStatus").textContent = "";
+    $("phoneWhy").textContent = (chosen ? "Telefonunuzun" : "Bu tarayıcı sayfadan kayıt yapamıyor. Telefonunuzun") +
+      " ses kayıt uygulamasıyla kaydedip dosyaları buradan yükleyebilirsiniz:";
+    $("phoneHelp").hidden = false;
+    $("sheet").open = true;
+    ["micBtn", "testAir", "phoneBtn"].forEach(id => { $(id).hidden = true; });
+  }
+
+  let peak = 0;
+  const buf = new Float32Array(1024);
+  function meterLoop() {
+    analyser.getFloatTimeDomainData(buf);
+    let m = 0;
+    for (let i = 0; i < buf.length; i++) { const a = Math.abs(buf[i]); if (a > m) m = a; }
+    peak = Math.max(m, peak * 0.85);
+    if (meterTarget) {
+      const db = 20 * Math.log10(peak + 1e-9);
+      meterTarget.firstElementChild.style.width = Math.max(0, Math.min(100, (db + 60) / 60 * 100)) + "%";
+      meterTarget.classList.toggle("hot", db > -3);
+      if (recording) recording.hot = recording.hot || db > -0.5;
+    }
+    if (recording) {
+      const secs = (performance.now() - recording.t0) / 1000;
+      $("takeLen").textContent = comma(secs, 1) + " sn";
+      if (secs >= SECTIONS[PROMPTS[index].sec].max) stopTake();
+    }
+    requestAnimationFrame(meterLoop);
+  }
+
+  // ---------------------------------------------------------------- the booth
+  function startBooth() {
+    if (recording || starting) return;
+    $("booth").hidden = false;
+    $("finish").hidden = false;
+    meterTarget = $("meter");
+    restore().then(() => {
+      render();
+      $("booth").scrollIntoView({ behavior: smooth, block: "start" });
+      $("recBtn").focus({ preventScroll: true });
+      pump();
+    });
+  }
+  const REFUSED = {
+    code: "bu bağlantı geçerli değil; size gönderilen bağlantının tamamını kullanın",
+    full: "bu bağlantının kayıt sınırı doldu; lütfen bize haber verin",
+    size: "kayıt çok büyük",
+    mime: "bu kayıt biçimi desteklenmiyor",
+    consent: "onay kaydı kabul edilmedi; lütfen bize haber verin",
+    take: "kayıt tanınmadı; lütfen bize haber verin",
+  };
+  const stateText = t => t.state === "refused" ? "yüklenemedi: " + (REFUSED[t.why] || t.why) :
+    ({ wait: UPLOAD_URL ? "yükleniyor…" : "bu tarayıcıda saklandı", done: "bize ulaştı ✓", fail: "yüklenemedi; internet bağlantınızı kontrol edin" })[t.state];
+  function render() {
+    const p = PROMPTS[index];
+    const s = SECTIONS[p.sec];
+    $("secName").textContent = s.name;
+    $("count").textContent = (index + 1) + " / " + PROMPTS.length;
+    $("readText").textContent = p.text;
+    $("howText").textContent = p.how ? "(" + p.how + ")" : s.how;
+    $("prevBtn").disabled = index === 0;
+    $("nextBtn").disabled = false;
+    $("nextBtn").textContent = index === PROMPTS.length - 1 ? "Bitti" : "Sonraki →";
+    const t = takes.get(p.id);
+    $("playBtn").disabled = !t || !t.blob;
+    $("recBtn").textContent = t ? "● Yeniden kaydet" : "● Kaydet";
+    $("takeLen").textContent = t ? comma(t.seconds, 1) + " sn" : "";
+    $("upStatus").textContent = t ? "Bu kayıt: " + stateText(t) : "";
+    $("upStatus").className = "status" + (t ? (t.state === "done" ? " ok" : t.state === "wait" ? " warn" : " err") : "");
+    const dots = $("dots");
+    if (dots.childElementCount !== PROMPTS.length) {
+      dots.innerHTML = "";
+      PROMPTS.forEach(() => dots.appendChild(document.createElement("b")));
+    }
+    let done = 0, failed = 0, waiting = 0, refused = 0;
+    PROMPTS.forEach((q, i) => {
+      const tk = takes.get(q.id);
+      const st = tk ? tk.state : "";
+      if (st === "done") done++; else if (st === "fail") failed++; else if (st === "wait") waiting++; else if (st === "refused") refused++;
+      dots.children[i].className = (st === "refused" ? "fail" : st) + (i === index ? " here" : "");
+    });
+    $("retryBtn").hidden = failed === 0;
+    $("finishText").textContent = done + " kaydınız bize ulaştı" + (waiting ? ", " + waiting + " tanesi yükleniyor" : "") +
+      (failed ? ", " + failed + " tanesi yüklenemedi (yukarıdaki düğmeyle yeniden deneyin)" : "") +
+      (refused ? ", " + refused + " tanesi kabul edilmedi (kırmızı karelerde nedeni yazıyor)" : "") + ".";
+    if (takes.size) $("finish").hidden = false;
+    // an upload landing mid-take re-renders: the take's own controls stay as they are
+    if (recording || starting) {
+      $("recBtn").textContent = "■ Durdur";
+      ["prevBtn", "nextBtn", "playBtn"].forEach(id => { $(id).disabled = true; });
+    }
+  }
+  function say(text, bad) { $("boothStatus").textContent = text; $("boothStatus").className = bad ? "status err" : "status"; }
+  $("prevBtn").addEventListener("click", () => { if (recording || starting) return; if (index > 0) { index--; say(""); render(); } });
+  $("nextBtn").addEventListener("click", () => {
+    if (recording || starting) return;
+    if (index < PROMPTS.length - 1) { index++; say(""); render(); }
+    else $("finish").scrollIntoView({ behavior: smooth, block: "start" });
+  });
+  $("recBtn").addEventListener("click", () => { recording ? stopTake() : startTake(); });
+  $("playBtn").addEventListener("click", playTake);
+  const requeue = () => { takes.forEach(t => { if (t.state === "fail") { t.state = "wait"; t.tries = 0; } }); render(); pump(); };
+  $("retryBtn").addEventListener("click", requeue);
+  document.addEventListener("keydown", e => {
+    if ($("booth").hidden || e.target.tagName === "INPUT" || e.repeat) return;
+    if (e.code === "Space") { e.preventDefault(); $("recBtn").click(); }
+    if (e.code === "ArrowRight") $("nextBtn").click();
+    if (e.code === "ArrowLeft") $("prevBtn").click();
+  });
+
+  let wake = null, player = null;
+  function recFailed(text) {
+    recording = null;
+    starting = false;
+    $("recBtn").disabled = false;
+    render();
+    say(text, true);
+  }
+  async function startTake() {
+    if (recording || starting) return;
+    starting = true;
+    $("recBtn").disabled = true;
+    if (player) player.pause();
+    try { if (ctx && ctx.state === "suspended") await ctx.resume(); } catch (e) { /* the meter only */ }
+    // the microphone goes away when a headset is unplugged, a call comes in or the phone locks: ask for it again
+    if (!live()) {
+      try { await openMic(); } catch (e) {
+        $("phoneBtn").hidden = false;
+        recFailed("Mikrofona yeniden erişilemedi. Mikrofon iznini kontrol edip sayfayı yenileyin ya da yukarıdaki “Telefonun ses kayıt uygulamasıyla kaydet” düğmesini kullanın.");
+        return;
+      }
+    }
+    const chunks = [];
+    const pid = PROMPTS[index].id;
+    let rec;
+    try {
+      rec = mime ? new MediaRecorder(stream, { mimeType: mime, audioBitsPerSecond: 128000 }) : new MediaRecorder(stream);
+      recording = { rec, chunks, pid, t0: performance.now(), hot: false, stopped: false };
+      rec.ondataavailable = ev => { if (ev.data && ev.data.size) chunks.push(ev.data); };
+      rec.onerror = () => say("Kayıt sırasında bir sorun oldu; bu metni yeniden kaydedin.", true);
+      rec.onstop = () => finishTake(chunks, pid, rec);
+      rec.start(1000);
+    } catch (e) {
+      recFailed("Kayıt başlatılamadı; bir kez daha deneyin, olmazsa sayfayı yenileyin.");
+      return;
+    }
+    starting = false;
+    $("recBtn").disabled = false;
+    $("air").textContent = "kayıtta";
+    $("air").classList.add("live");
+    $("recBtn").textContent = "■ Durdur";
+    ["prevBtn", "nextBtn", "playBtn"].forEach(id => { $(id).disabled = true; });
+    say("");
+    try { navigator.wakeLock.request("screen").then(w => { if (recording) wake = w; else w.release(); }).catch(() => {}); } catch (e) { /* none here */ }
+  }
+  function stopTake() {
+    if (!recording || recording.stopped) return;
+    const r = recording;
+    r.seconds = (performance.now() - r.t0) / 1000;
+    r.stopped = true;
+    try { r.rec.stop(); } catch (e) { /* already stopped */ }
+  }
+  function finishTake(chunks, pid, rec) {
+    const info = recording;
+    recording = null;
+    $("air").textContent = "hazır";
+    $("air").classList.remove("live");
+    try { if (wake) wake.release(); } catch (e) { /* gone already */ }
+    wake = null;
+    $("nextBtn").disabled = false;
+    // a recorder that stopped on its own (the microphone went away) keeps what it caught
+    const cut = !!info && !info.stopped;
+    const seconds = info ? (info.seconds || (performance.now() - info.t0) / 1000) : 0;
+    if (seconds < 0.3 || !chunks.length) { render(); say(cut ? "Kayıt beklenmedik biçimde durdu; yeniden deneyin." : "Kayıt çok kısaydı; yeniden deneyin.", true); return; }
+    const type = (rec.mimeType || mime || "audio/webm").split(";")[0];
+    const take = { blob: new Blob(chunks, { type }), mime: type, seconds, state: "wait", tries: 0, why: "",
+      n: PROMPTS.findIndex(p => p.id === pid) + 1, uid: uidOf(), consent: consentRecord(), recordedAt: new Date().toISOString() };
+    takes.set(pid, take);
+    persist(pid, take);
+    render();
+    if (cut) say("Kayıt beklenmedik biçimde durdu; kaydedilen kısım saklandı. Dinleyip gerekirse yeniden kaydedin.", true);
+    else say(info && info.hot ? "Ses biraz fazla yüksek; mikrofondan biraz uzaklaşıp yeniden kaydedin." : "", info && info.hot);
+    pump();
+  }
+  function playTake() {
+    const t = takes.get(PROMPTS[index].id);
+    if (!t || !t.blob) return;
+    if (player) { player.pause(); URL.revokeObjectURL(player.src); }
+    player = new Audio(URL.createObjectURL(t.blob));
+    player.play().catch(() => say("Oynatılamadı; bir kez daha deneyin.", true));
+  }
+
+  // ---------------------------------------------------------------- uploads: one take at a time, retried, kept until they land
+  let pumping = false;
+  async function pump() {
+    if (pumping || !UPLOAD_URL) return;
+    pumping = true;
+    try {
+      for (;;) {
+        const next = [...takes.entries()].find(([, t]) => t.state === "wait");
+        if (!next) break;
+        const [pid, t] = next;
+        const res = await upload(pid, t);
+        if (takes.get(pid) !== t) continue;  // re-taken meanwhile: the new one goes next
+        if (res.ok) { t.state = "done"; persist(pid, t); }
+        else if (res.why) { t.state = "refused"; t.why = res.why; }  // the script said no: retrying can't help
+        else {
+          t.tries++;
+          if (t.tries >= 4) t.state = "fail";
+          else await new Promise(r => setTimeout(r, 2000 * t.tries));
+        }
+        render();
+      }
+    } finally { pumping = false; }
+  }
+  function base64(blob) {
+    return new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(String(r.result).split(",")[1] || "");
+      r.onerror = () => rej(r.error);
+      r.readAsDataURL(blob);
+    });
+  }
+  // {ok: true}, {why: the script's reason} when it refused, or {} when the network failed and a retry may land
+  async function upload(pid, t) {
+    const stop = new AbortController();
+    // given time for a slow uplink: 30 s, plus a second per 25 kB (a 15 MB phone file at 1 Mbit/s fits)
+    const timer = setTimeout(() => stop.abort(), 30000 + t.blob.size * 4 / 3 / 25);
+    try {
+      const body = JSON.stringify({ code, take: pid, uid: t.uid, n: t.n, mime: t.mime, seconds: Math.round(t.seconds * 100) / 100,
+        recorded_at: t.recordedAt, audio: await base64(t.blob), consent: t.consent });
+      const r = await fetch(UPLOAD_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body, redirect: "follow", signal: stop.signal });
+      if (!r.ok) return {};
+      const j = await r.json();
+      if (j && j.ok) return { ok: true };
+      return j && j.error && j.error !== "error" ? { why: String(j.error) } : {};
+    } catch (e) {
+      return {};
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  window.addEventListener("online", requeue);
+  window.addEventListener("beforeunload", e => {
+    if ([...takes.values()].some(t => t.state === "wait" || t.state === "fail")) { e.preventDefault(); e.returnValue = ""; }
+  });
+
+  // ---------------------------------------------------------------- phone recordings, uploaded as files
+  const BY_EXT = { m4a: "audio/mp4", mp4: "audio/mp4", aac: "audio/aac", mp3: "audio/mpeg", wav: "audio/wav", ogg: "audio/ogg",
+    opus: "audio/opus", webm: "audio/webm", flac: "audio/flac", caf: "audio/x-caf", amr: "audio/amr", "3gp": "audio/3gpp" };
+  // the types Code.gs takes (its EXT)
+  const ACCEPTED = ["audio/webm", "audio/ogg", "audio/opus", "audio/mp4", "audio/x-m4a", "audio/m4a", "audio/aac", "audio/x-aac", "audio/mpeg",
+    "audio/mp3", "audio/wav", "audio/x-wav", "audio/wave", "audio/flac", "audio/x-caf", "audio/3gpp", "audio/amr", "video/mp4", "video/webm"];
+  $("fileIn").addEventListener("change", async () => {
+    const files = [...$("fileIn").files];
+    $("fileIn").value = "";
+    if (!UPLOAD_URL) { $("fileStatus").textContent = "Yükleme şu an kapalı."; $("fileStatus").className = "status err"; return; }
+    for (const f of files) {
+      const li = document.createElement("li");
+      li.textContent = f.name + ": yükleniyor…";
+      $("fileList").appendChild(li);
+      if (f.size > MAX_FILE) { li.textContent = f.name + ": çok büyük (en fazla 15 MB); daha kısa bölümler halinde kaydedin."; continue; }
+      const ext = (f.name.split(".").pop() || "").toLowerCase();
+      const given = (f.type || "").split(";")[0].toLowerCase();
+      // a picker's own name for the type (audio/mp4a-latm, audio/x-flac) goes by the file's extension instead
+      const type = ACCEPTED.includes(given) ? given : (BY_EXT[ext] || "audio/mp4");
+      // a phone file has no prompt of its own: it goes by its own id, so none overwrites another
+      const t = { blob: f, mime: type, seconds: 0, n: 0, uid: uidOf(), consent: consentRecord(), recordedAt: new Date(f.lastModified || Date.now()).toISOString() };
+      const pid = "P" + t.uid;
+      let res = {};
+      for (let attempt = 0; attempt < 4 && !res.ok && !res.why; attempt++) {
+        if (attempt) await new Promise(r => setTimeout(r, 2000 * attempt));
+        res = await upload(pid, t);
+      }
+      li.textContent = f.name + (res.ok ? ": bize ulaştı ✓" : res.why ? ": yüklenemedi: " + (REFUSED[res.why] || res.why) + "." :
+        ": yüklenemedi; internet bağlantınızı kontrol edip dosyayı yeniden seçin.");
+    }
+  });
+
+  // ---------------------------------------------------------------- this browser keeps the takes until they have landed
+  let dbOpen = null;
+  function idb() {
+    if (!dbOpen) {
+      dbOpen = new Promise((res, rej) => {
+        try {
+          const r = indexedDB.open("ses-bagisi-web", 1);
+          r.onupgradeneeded = () => r.result.createObjectStore("takes");
+          r.onsuccess = () => res(r.result);
+          r.onerror = () => rej(r.error);
+        } catch (e) { rej(e); }
+      });
+      dbOpen.catch(() => { dbOpen = null; });
+    }
+    return dbOpen;
+  }
+  const key = pid => code + "|" + pid;
+  let warned = false;
+  async function persist(pid, t) {
+    try {
+      const db = await idb();
+      await new Promise((res, rej) => {
+        const tx = db.transaction("takes", "readwrite");
+        // a landed take is forgotten here; one still to send keeps its audio and the consent it was made under
+        if (t.state === "done") tx.objectStore("takes").put({ state: "done", seconds: t.seconds, n: t.n }, key(pid));
+        else tx.objectStore("takes").put({ blob: t.blob, mime: t.mime, seconds: t.seconds, n: t.n, uid: t.uid, consent: t.consent,
+          recordedAt: t.recordedAt, state: "wait" }, key(pid));
+        tx.oncomplete = res; tx.onerror = () => rej(tx.error); tx.onabort = () => rej(tx.error);
+      });
+    } catch (e) {
+      if (!warned) say("Kayıtlar bu tarayıcıda saklanamıyor; yüklemeler bitmeden sayfayı kapatmayın.", true);
+      warned = true;
+    }
+  }
+  async function forget() {
+    try {
+      const db = await idb();
+      await new Promise(res => {
+        const tx = db.transaction("takes", "readwrite");
+        PROMPTS.forEach(p => tx.objectStore("takes").delete(key(p.id)));
+        tx.oncomplete = res; tx.onerror = res; tx.onabort = res;
+      });
+    } catch (e) { /* nothing kept */ }
+  }
+  let restoring = null;
+  function restore() {
+    if (!restoring) restoring = (async () => {
+      try {
+        const db = await idb();
+        const store = db.transaction("takes", "readonly").objectStore("takes");
+        let count = 0;
+        await Promise.all(PROMPTS.map(p => new Promise(res => {
+          const g = store.get(key(p.id));
+          g.onsuccess = () => {
+            const v = g.result;
+            // a take still to send goes back in the queue, whatever stopped it last time
+            if (v && !takes.has(p.id) && (v.state === "done" || (v.blob && v.consent))) {
+              takes.set(p.id, { blob: v.blob || null, mime: v.mime, seconds: v.seconds || 0, n: v.n, uid: v.uid || uidOf(), consent: v.consent,
+                recordedAt: v.recordedAt || new Date().toISOString(),
+                state: v.state === "done" ? "done" : "wait", tries: 0, why: "" });
+              count++;
+            }
+            res();
+          };
+          g.onerror = () => res();
+        })));
+        if (count) {
+          const next = PROMPTS.findIndex(p => !takes.has(p.id));
+          index = next < 0 ? PROMPTS.length - 1 : next;
+          say(count + " eski kaydınız bulundu; kaldığınız yerden devam edebilirsiniz.");
+        }
+      } catch (e) { /* nothing kept */ }
+    })();
+    return restoring;
+  }
+
+  // ---------------------------------------------------------------- the reading sheet
+  function renderSheet() {
+    const body = $("sheetBody");
+    let ol = null, last = -1;
+    PROMPTS.forEach((p, i) => {
+      if (p.sec !== last) {
+        const h = document.createElement("h3");
+        h.textContent = SECTIONS[p.sec].name;
+        body.appendChild(h);
+        ol = document.createElement("ol");
+        ol.start = i + 1;
+        body.appendChild(ol);
+        last = p.sec;
+      }
+      const li = document.createElement("li");
+      li.textContent = p.text + (p.how ? " (" + p.how + ")" : "");
+      ol.appendChild(li);
+    });
+  }
+})();
+</script>
+</body>
+</html>
